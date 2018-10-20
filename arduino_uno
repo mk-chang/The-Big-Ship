@@ -1,0 +1,206 @@
+
+// pins for the encoder inputs
+#define RH_ENCODER_A 1 
+#define RH_ENCODER_B 6
+#define LH_ENCODER_A 4
+#define LH_ENCODER_B 5
+#define FR_ENCODER_A 2 
+#define FR_ENCODER_B 3
+#define RR_ENCODER_A 10
+#define RR_ENCODER_B 11
+
+// variables to store the number of encoder pulses
+// for each motor
+int RH_State;
+int RH_LastState;
+int LH_State;
+int LH_LastState;
+int FR_State;
+int FR_LastState;
+int RR_State;
+int RR_LastState;
+
+int RH_position = 0;
+int LH_position = 0;
+int FR_position = 0;
+int RR_position = 0;
+
+char incomingByte;
+char command;
+
+int L=1000;
+
+#define d_speed 200
+#define r_speed 150
+
+//read_encoder function 
+void readEncoder(int pin_A, int pin_B,int State, int LastState, int encoder_position){
+  State = digitalRead(pin_A); // Reads the "current" state of the outputA
+   // If the previous and the current state of the outputA are different, that means a Pulse has occured
+   if (State != LastState){     
+     // If the outputB state is different to the outputA state, that means the encoder is rotating clockwise
+     if (digitalRead(pin_B) != State) { 
+       encoder_position ++;
+     } else {
+       encoder_position --;
+     }
+   } 
+   LastState = State; // Updates the previous state of the outputA with the current state
+   Serial.println(encoder_position);
+}
+
+//Channel A for RH and LH
+void runA(int speed, boolean rev) {  
+  if(rev) {
+    //Establishes backward direction of Channel A
+    digitalWrite(12, LOW);
+  }else {
+    //Establishes forward direction of Channel A
+    digitalWrite(12, HIGH); 
+  }
+  digitalWrite(9, LOW);   //Disengage the Brake for Channel A
+  analogWrite(3, speed);   //Spins the motor on Channel A at full speed
+}  
+
+//Channel B for FR and RR
+void runB(int speed, boolean rev) {
+  if(rev) {
+    digitalWrite(13, LOW); //Establishes backwards direction of Channel B
+  }else{
+    digitalWrite(13, HIGH); //Establishes forward direction of Channel B
+  }
+   
+  digitalWrite(8, LOW);   //Disengage the Brake for Channel B
+  analogWrite(11, speed);   //Spins the motor on Channel B at full speed 
+}
+
+//fullstop
+void fs(){
+  digitalWrite(8, HIGH);
+  digitalWrite(9, HIGH);
+}
+ 
+ 
+void setup() {
+  pinMode(RH_ENCODER_A, INPUT);
+  pinMode(RH_ENCODER_B, INPUT);
+  pinMode(LH_ENCODER_A, INPUT);
+  pinMode(LH_ENCODER_B, INPUT);
+  pinMode(FR_ENCODER_A, INPUT);
+  pinMode(FR_ENCODER_B, INPUT);
+  pinMode(RR_ENCODER_A, INPUT);
+  pinMode(RR_ENCODER_B, INPUT);
+  
+  Serial.begin(9600);
+
+  RH_LastState = digitalRead(RH_ENCODER_A);
+  LH_LastState = digitalRead(LH_ENCODER_A);
+  FR_LastState = digitalRead(FR_ENCODER_A);
+  RR_LastState = digitalRead(RR_ENCODER_A);
+  
+  //setup Channel A
+  pinMode(12, OUTPUT); //Initiates the Motor Channel A pin
+  pinMode(9, OUTPUT); //Initiates the Brake channel A 
+  //Setup Channel B
+  pinMode(13, OUTPUT); //Initiates Motor Channel B pin
+  pinMode(8, OUTPUT);  //Initiates Brake Channel B pin
+ 
+}
+ 
+void loop() {
+  if (Serial.available()>0){
+    incomingByte=Serial.read();
+    command=incomingByte;
+    }
+
+  //send "forward" then distance to travel
+  if (command == 'f') {
+    //read distance amount
+//    while (!Serial.available());
+//    int L=Serial.read();
+    Serial.println("forward");
+    
+    // turn on Motors
+    runA(d_speed,true);
+    
+    //run motor until reach position
+    for (;RH_position==L ||LH_position==L;){
+      readEncoder(RH_ENCODER_A,RH_ENCODER_B,RH_State,RH_LastState,RH_position);
+      readEncoder(LH_ENCODER_A,LH_ENCODER_B,LH_State,LH_LastState,LH_position);
+    }
+
+    //full stop
+    fs();
+    command = 's';
+    Serial.println("finished forward");
+  }
+  
+  //if backwards
+    if (command == 'b') {
+    //read distance amount
+//    while (!Serial.available());
+//    int L=Serial.read();
+
+    Serial.println("backwards");
+    
+    // turn on Motors
+    runA(d_speed,false);
+    
+    //run motor until reach position
+    for (;RH_position==L ||LH_position==L;){
+      readEncoder(RH_ENCODER_A,RH_ENCODER_B,RH_State,RH_LastState,RH_position);
+      readEncoder(LH_ENCODER_A,LH_ENCODER_B,LH_State,LH_LastState,LH_position);
+    }
+
+    //full stop
+    fs();
+    command = 's';
+    Serial.println("finished backwards");
+  }
+  
+  
+  //if rotate clockwise
+  if (Serial.read() == 'r') {
+    //experiment value of L for 90 degrees rotation
+//    int L=500;
+
+    Serial.println("right");
+    
+    // turn on Motors
+    runB(r_speed,true);
+    
+    //run motor until reach position
+    for (;RH_position==L ||LH_position==L;){
+      readEncoder(FR_ENCODER_A,FR_ENCODER_B,FR_State,FR_LastState,FR_position);
+      readEncoder(RR_ENCODER_A,RR_ENCODER_B,RR_State,RR_LastState,RR_position);
+    }
+
+    //full stop
+    fs();
+    command = 's';
+    Serial.println("finished right");
+  }
+    
+
+  //if rotate counter clockwise
+    if (Serial.read() == "l") {
+    //experiment value of L for 90 degrees rotation
+//    int L=50;
+    Serial.println("left");
+    
+    // turn on Motors
+    runB(r_speed,false);
+    
+    //run motor until reach position
+    for (;RH_position==L ||LH_position==L;){
+      readEncoder(FR_ENCODER_A,FR_ENCODER_B,FR_State,FR_LastState,FR_position);
+      readEncoder(RR_ENCODER_A,RR_ENCODER_B,RR_State,RR_LastState,RR_position);
+    }
+
+    //full stop
+    fs();
+    command = 's';
+    Serial.println("finsihed left");
+    }
+
+}
